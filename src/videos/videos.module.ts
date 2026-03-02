@@ -6,7 +6,7 @@ import { Video } from './video.entity';
 import { Borrow } from '../borrow/borrow.entity';
 
 @Module({
-  imports: [TypeOrmModule.forFeature([Video, Borrow])],
+  imports: [],
   providers: [VideosService],
   controllers: [VideosController]
 })

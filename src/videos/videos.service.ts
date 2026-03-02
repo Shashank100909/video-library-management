@@ -1,136 +1,129 @@
-import { Injectable , NotFoundException,
-    BadRequestException,} from '@nestjs/common';
-import { InjectRepository } from '@nestjs/typeorm';
-import { Video } from './video.entity';
-import { Repository } from 'typeorm';
+import {
+  Injectable,
+  NotFoundException,
+  BadRequestException,
+} from '@nestjs/common';
+import { PrismaService } from '../prisma/prisma.service';
 import { CreateVideoDto } from './dto/create-video.dto';
-import { BorrowStatus } from '../borrow/borrow.entity';
-import { Borrow } from '../borrow/borrow.entity';
 import { UpdateVideoDto } from './dto/update-video.dto';
+import { BorrowStatus } from '@prisma/client';
 
 @Injectable()
 export class VideosService {
-    constructor(
-        @InjectRepository(Video)
-        private videoRepository: Repository<Video>,
-        @InjectRepository(Borrow)
-        private borrowRepository: Repository<Borrow>,
-    ) { }
+  constructor(private prisma: PrismaService) {}
 
-    async create(createVideoDto: CreateVideoDto) {
+  async create(createVideoDto: CreateVideoDto) {
+    const existing = await this.prisma.video.findFirst({
+      where: { title: createVideoDto.title },
+    });
 
-        const existing = await this.videoRepository.findOne({
-            where: { title: createVideoDto.title },
-        });
-
-        if (existing) {
-            throw new BadRequestException('Title already exists')
-        }
-
-        const video = await this.videoRepository.save({
-            ...createVideoDto,
-            availableCopies: createVideoDto.totalCopies,
-        });
-
-        return {
-            message: "Video added successfully",
-            id: video.id,
-        };
-
+    if (existing) {
+      throw new BadRequestException('Title already exists');
     }
-    async findAll( page: number, limit: number, order: 'ASC' | 'DESC',) {
-      const skip = (page -1) * limit;
 
-      const [data, total] = await this.videoRepository.findAndCount({
+    const video = await this.prisma.video.create({
+      data: {
+        ...createVideoDto,
+        availableCopies: createVideoDto.totalCopies,
+      },
+    });
+
+    return {
+      message: 'Video added successfully',
+      id: video.id,
+    };
+  }
+
+  async findAll(page: number, limit: number, order: 'asc' | 'desc') {
+    const skip = (page - 1) * limit;
+
+    const [data, total] = await this.prisma.$transaction([
+      this.prisma.video.findMany({
         skip,
         take: limit,
-        order: {
-          id: order,
-        }
-      });
-        return {total, page, limit, data,};
+        orderBy: { id: order },
+      }),
+      this.prisma.video.count(),
+    ]);
+
+    return { total, page, limit, data };
+  }
+
+  async deleteVideo(videoId: number) {
+    const video = await this.prisma.video.findUnique({
+      where: { id: videoId },
+    });
+
+    if (!video) {
+      throw new NotFoundException('Video not found');
     }
 
-    async deleteVideo(videoId: number) {
-        const video = await this.videoRepository.findOne({
-          where: { id: videoId },
-          withDeleted: true,
-        });
-      
-        
-        if (!video) {
-          throw new NotFoundException('Video not found');
-        }
+    if (video.deletedAt) {
+      throw new BadRequestException('Video already deleted');
+    }
 
-        console.log('deletedAt value:', video.deletedAt);
-        if(video.deletedAt) {
-          throw new BadRequestException('Video already deleted');
-        }
-      
-        const activeBorrow = await this.borrowRepository.findOne({
-          where: {
-            video: { id: videoId },
-            status: BorrowStatus.BORROWED,
-          },
-        });
-      
-        if (activeBorrow) {
-          throw new BadRequestException(
-            'Cannot delete video. It is currently borrowed.',
-          );
-        }
+    const activeBorrow = await this.prisma.borrow.findFirst({
+      where: {
+        videoId: videoId,
+        status: BorrowStatus.BORROWED,
+      },
+    });
 
-        
-        await this.videoRepository.softDelete(videoId);
-      
-        return { 
-          message: 'Video deleted successfully',
-          VideoId: video.id
-        };
+    if (activeBorrow) {
+      throw new BadRequestException(
+        'Cannot delete video. It is currently borrowed.',
+      );
+    }
+
+    await this.prisma.video.update({
+      where: { id: videoId },
+      data: { deletedAt: new Date() },
+    });
+
+    return {
+      message: 'Video deleted successfully',
+      videoId: video.id,
+    };
+  }
+
+  async updateVideo(videoId: number, dto: UpdateVideoDto) {
+    const video = await this.prisma.video.findUnique({
+      where: { id: videoId },
+    });
+
+    if (!video) {
+      throw new NotFoundException('Video not found');
+    }
+
+    let totalCopies = video.totalCopies;
+    let availableCopies = video.availableCopies;
+
+    if (dto.totalCopies !== undefined) {
+      const borrowedCount = video.totalCopies - video.availableCopies;
+
+      if (dto.totalCopies < borrowedCount) {
+        throw new BadRequestException(
+          'Total copies cannot be less than currently borrowed copies',
+        );
       }
 
-      async updateVideo(videoId: number, dto: UpdateVideoDto) {
-       
-        const video = await this.videoRepository.findOne({
-          where: { id: videoId },
-        });
-      
-        if (!video) {
-          throw new NotFoundException('Video not found');
-        }
-      
-        
-        if (dto.totalCopies !== undefined) {
-          const borrowedCount =
-            video.totalCopies - video.availableCopies;
-      
-          if (dto.totalCopies < borrowedCount) {
-            throw new BadRequestException(
-              'Total copies cannot be less than currently borrowed copies',
-            );
-          }
-      
-          video.availableCopies =
-            dto.totalCopies - borrowedCount;
-      
-          video.totalCopies = dto.totalCopies;
-        }
-      
-       
-        if (dto.title !== undefined) {
-          video.title = dto.title;
-        }
-      
-        if (dto.description !== undefined) {
-          video.description = dto.description;
-        }
-      
-        
-        await this.videoRepository.save(video);
-      
-        return {
-          message: 'Video updated successfully',
-          id: video.id,
-        };
-      }
+      totalCopies = dto.totalCopies;
+      availableCopies = dto.totalCopies - borrowedCount;
+    }
+
+    const updated = await this.prisma.video.update({
+      where: { id: videoId },
+      data: {
+        title: dto.title ?? video.title,
+        description: dto.description ?? video.description,
+        totalCopies,
+        availableCopies,
+      },
+    });
+
+    return {
+      message: 'Video updated successfully',
+      id: updated.id,
+    };
+  }
 }
