@@ -8,7 +8,7 @@ import { User } from './user.entity';
 
 @Module({
   imports: [
-    TypeOrmModule.forFeature([User]),  // 👈 add this back
+    TypeOrmModule.forFeature([User]),  
     PrismaModule,
   ],
   controllers: [UsersController],

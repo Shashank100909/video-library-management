@@ -25,7 +25,7 @@ export class UsersService {
       data: {
         ...createUserDto,
         password: hashedPassword,
-        role: UserRole.USER,
+        role: UserRole.ADMIN,
       },
     });
 

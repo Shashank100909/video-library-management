@@ -27,6 +27,8 @@ model Video {
   totalCopies     Int
   availableCopies Int
   deletedAt       DateTime?
+  playCount       Int @default(0)
+  borrowCount     Int @default(0)
 
   borrows         Borrow[]
   @@map("video")
@@ -38,11 +40,11 @@ model Borrow {
   returnedAt DateTime?
   status     BorrowStatus  @default(BORROWED)
 
-  userId     Int?
-  videoId    Int?
+  userId     Int
+  videoId    Int
 
-  user       User?  @relation(fields: [userId], references: [id])
-  video      Video? @relation(fields: [videoId], references: [id])
+  user       User  @relation(fields: [userId], references: [id])
+  video      Video @relation(fields: [videoId], references: [id])
   @@map("borrow")
 }
 
