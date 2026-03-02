@@ -1,0 +1,61 @@
+generator client {
+  provider = "prisma-client-js"
+  engineType = "binary"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id       Int       @id @default(autoincrement())
+  name     String
+  email    String    @unique
+  password String
+  role     UserRole  @default(USER)
+
+  borrows  Borrow[]
+
+  @@map("user")
+}
+
+model Video {
+  id              Int       @id @default(autoincrement())
+  title           String
+  description     String
+  totalCopies     Int
+  availableCopies Int
+  deletedAt       DateTime?
+
+  borrows         Borrow[]
+  @@map("video")
+}
+
+model Borrow {
+  id         Int           @id @default(autoincrement())
+  borrowedAt DateTime      @default(now())
+  returnedAt DateTime?
+  status     BorrowStatus  @default(BORROWED)
+
+  userId     Int?
+  videoId    Int?
+
+  user       User?  @relation(fields: [userId], references: [id])
+  video      Video? @relation(fields: [videoId], references: [id])
+  @@map("borrow")
+}
+
+enum BorrowStatus {
+  BORROWED
+  RETURNED
+
+  @@map("borrow_status_enum")
+}
+
+enum UserRole {
+  USER
+  ADMIN
+
+  @@map("user_role_enum")
+}

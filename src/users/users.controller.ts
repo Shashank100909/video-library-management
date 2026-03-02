@@ -5,7 +5,7 @@ import { UseGuards } from '@nestjs/common';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { RolesGuard } from '../auth/roles.guard';
 import { Roles } from '../auth/roles.decorator';
-import { UserRole } from './user.entity';
+import { UserRole } from '@prisma/client';
 
 @Controller('users')
 export class UsersController {
@@ -23,7 +23,7 @@ export class UsersController {
   getAllUsers(
     @Query('page', new DefaultValuePipe(1), ParseIntPipe) page:number,
     @Query('limit', new DefaultValuePipe(10), ParseIntPipe) limit: number,
-    @Query('order', new DefaultValuePipe('DESC')) order: 'ASC' | 'DESC',
+    @Query('order', new DefaultValuePipe('desc')) order: 'asc' | 'desc',
   ) {
     return this.usersService.findAll(page, limit, order);
   }

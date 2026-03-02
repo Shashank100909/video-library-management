@@ -1,4 +1,4 @@
-import { UserRole } from '../user.entity';
+import { UserRole } from '@prisma/client';
 
 export class UserResponseDto {
   id: number;

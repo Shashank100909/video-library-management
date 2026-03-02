@@ -5,7 +5,7 @@ import { UpdateVideoDto } from './dto/update-video.dto'
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { RolesGuard } from '../auth/roles.guard';
 import { Roles } from '../auth/roles.decorator';
-import { UserRole } from '../users/user.entity';
+import { UserRole } from '@prisma/client';
 
 @Controller('videos')
 export class VideosController {
@@ -22,7 +22,7 @@ export class VideosController {
     getAllMovies(
       @Query('page', new DefaultValuePipe(1), ParseIntPipe) page: number,
       @Query('limit', new DefaultValuePipe(10), ParseIntPipe) limit: number,
-      @Query('order', new DefaultValuePipe('DESC')) order: 'ASC' | 'DESC',
+      @Query('order', new DefaultValuePipe('desc')) order: 'asc' | 'desc',
     ) {
       return this.videosService.findAll(page, limit, order);
     }
