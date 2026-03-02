@@ -126,4 +126,80 @@ export class VideosService {
       id: updated.id,
     };
   }
+
+  async recordPlay(userId: number, videoId: number) {
+    return this.prisma.$transaction(async (tx) => {
+      const video = await tx.video.findUnique({
+        where: { id: videoId },
+      });
+  
+      if (!video) {
+        throw new NotFoundException('Video not found');
+      }
+  
+      
+      await tx.video.update({
+        where: { id: videoId },
+        data: {
+          playCount: {
+            increment: 1,
+          },
+        },
+      });
+  
+      await tx.videoPlayHistory.create({
+        data: {
+          userId,
+          videoId,
+        },
+      });
+  
+      return { message: 'Play recorded successfully' };
+    });
+  }
+
+  async saveProgress(
+    userId: number,
+    videoId: number,
+    lastWatchedSecond: number,
+  ) {
+    
+    if (lastWatchedSecond < 0) {
+      throw new BadRequestException('Invalid timestamp');
+    }
+  
+    await this.prisma.userVideoProgress.upsert({
+      where: {
+        userId_videoId: {
+          userId,
+          videoId,
+        },
+      },
+      update: {
+        lastWatchedSecond,
+      },
+      create: {
+        userId,
+        videoId,
+        lastWatchedSecond,
+      },
+    });
+  
+    return { message: 'Progress saved successfully' };
+  }
+
+  async getProgress(userId: number, videoId: number) {
+    const progress = await this.prisma.userVideoProgress.findUnique({
+      where: {
+        userId_videoId: {
+          userId,
+          videoId,
+        },
+      },
+    });
+  
+    return {
+      lastWatchedSecond: progress?.lastWatchedSecond ?? 0,
+    };
+  }
 }

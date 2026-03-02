@@ -4,7 +4,6 @@ import { VideosController } from './videos.controller';
 import { TypeOrmModule } from '@nestjs/typeorm';
 
 @Module({
-  imports: [],
   providers: [VideosService],
   controllers: [VideosController]
 })

@@ -16,6 +16,8 @@ model User {
   role     UserRole  @default(USER)
 
   borrows  Borrow[]
+  videoPlays VideoPlayHistory[]
+  progress     UserVideoProgress[]
 
   @@map("user")
 }
@@ -29,8 +31,11 @@ model Video {
   deletedAt       DateTime?
   playCount       Int @default(0)
   borrowCount     Int @default(0)
+  
 
   borrows         Borrow[]
+  playHistory     VideoPlayHistory[]
+  progress     UserVideoProgress[] 
   @@map("video")
 }
 
@@ -60,4 +65,31 @@ enum UserRole {
   ADMIN
 
   @@map("user_role_enum")
+}
+
+model VideoPlayHistory {
+  id        Int      @id @default(autoincrement())
+  userId    Int
+  videoId   Int
+  playedAt  DateTime @default(now())
+
+  user      User     @relation(fields: [userId], references: [id])
+  video     Video    @relation(fields: [videoId], references: [id])
+
+  @@index([videoId])
+  @@index([playedAt])
+}
+
+model UserVideoProgress {
+  id               Int      @id @default(autoincrement())
+  userId           Int
+  videoId          Int
+  lastWatchedSecond Int
+  updatedAt        DateTime @updatedAt
+
+  user   User  @relation(fields: [userId], references: [id])
+  video  Video @relation(fields: [videoId], references: [id])
+
+  @@unique([userId, videoId])
+  @@index([videoId])
 }
