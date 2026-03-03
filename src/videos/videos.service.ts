@@ -8,6 +8,7 @@ import { CreateVideoDto } from './dto/create-video.dto';
 import { UpdateVideoDto } from './dto/update-video.dto';
 import { BorrowStatus } from '@prisma/client';
 import {PaginationDto} from '../common/dto/pagination.dto'
+import {redisClient} from '../redis/redis.provider'
 
 @Injectable()
 export class VideosService {
@@ -37,6 +38,13 @@ export class VideosService {
 
   async findAll(query: PaginationDto) {
     const {page = 1, limit =10, order = 'desc'} = query 
+    const cacheKey = `videos:${page}:${limit}:${order}`;
+    const cached = await redisClient.get(cacheKey);
+    console.log('Cached value:', cached);
+    if (cached) {
+      console.log('Fetching from Redis');
+      return cached;
+    }
     const skip = (page - 1) * limit;
 
     const [data, total] = await this.prisma.$transaction([
@@ -48,7 +56,13 @@ export class VideosService {
       this.prisma.video.count(),
     ]);
 
-    return { total, page, limit, data };
+    const result = { total, page, limit, data };
+
+    await redisClient.set(cacheKey, JSON.stringify(result), {EX: 60});
+
+    console.log('Fetching from Database');
+
+    return result;
   }
 
   async deleteVideo(videoId: number) {
@@ -203,5 +217,24 @@ export class VideosService {
     return {
       lastWatchedSecond: progress?.lastWatchedSecond ?? 0,
     };
+  }
+
+  async getAllTimePopular(limit: number = 10) {
+    return this.prisma.video.findMany({
+      where: {
+        deletedAt: null,
+      },
+      orderBy: {
+        playCount: 'desc',
+      },
+      take: limit,
+      select: {
+        id: true,
+        title: true,
+        description: true,
+        playCount: true,
+        borrowCount: true,
+      },
+    });
   }
 }
