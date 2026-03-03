@@ -6,6 +6,8 @@ import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { RolesGuard } from '../auth/roles.guard';
 import { Roles } from '../auth/roles.decorator';
 import { UserRole } from '@prisma/client';
+import {PaginationDto } from '../common/dto/pagination.dto'
+import { queryObjects } from 'v8';
 
 @Controller('videos')
 export class VideosController {
@@ -20,12 +22,8 @@ export class VideosController {
     }
 
     @Get()
-    getAllMovies(
-        @Query('page', new DefaultValuePipe(1), ParseIntPipe) page: number,
-        @Query('limit', new DefaultValuePipe(10), ParseIntPipe) limit: number,
-        @Query('order', new DefaultValuePipe('desc')) order: 'asc' | 'desc',
-    ) {
-        return this.videosService.findAll(page, limit, order);
+    getAllMovies(@Query() query: PaginationDto) {
+        return this.videosService.findAll(query);
     }
 
     @UseGuards(JwtAuthGuard, RolesGuard)
@@ -71,14 +69,14 @@ export class VideosController {
     }
 
     @UseGuards(JwtAuthGuard)
-@Get(':id/progress')
-getProgress(
-  @Req() req,
-  @Param('id', ParseIntPipe) id: number,
-) {
-  return this.videosService.getProgress(
-    req.user.userId,
-    id,
-  );
-}
+    @Get(':id/progress')
+    getProgress(
+        @Req() req,
+        @Param('id', ParseIntPipe) id: number,
+    ) {
+        return this.videosService.getProgress(
+            req.user.userId,
+            id,
+        );
+    }
 }

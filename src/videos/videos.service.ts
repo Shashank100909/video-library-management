@@ -7,6 +7,7 @@ import { PrismaService } from '../prisma/prisma.service';
 import { CreateVideoDto } from './dto/create-video.dto';
 import { UpdateVideoDto } from './dto/update-video.dto';
 import { BorrowStatus } from '@prisma/client';
+import {PaginationDto} from '../common/dto/pagination.dto'
 
 @Injectable()
 export class VideosService {
@@ -34,7 +35,8 @@ export class VideosService {
     };
   }
 
-  async findAll(page: number, limit: number, order: 'asc' | 'desc') {
+  async findAll(query: PaginationDto) {
+    const {page = 1, limit =10, order = 'desc'} = query 
     const skip = (page - 1) * limit;
 
     const [data, total] = await this.prisma.$transaction([

@@ -4,6 +4,7 @@ import { CreateUserDto } from './dto/create-user.dto';
 import { UserResponseDto } from './dto/user-response.dto';
 import { UserRole } from '@prisma/client';
 import * as bcrypt from 'bcrypt';
+import {PaginationDto} from '../common/dto/pagination.dto'
 
 @Injectable()
 export class UsersService {
@@ -43,9 +44,9 @@ export class UsersService {
     });
   }
 
-  async findAll(page: number, limit: number, order: 'asc' | 'desc') {
+  async findAll(query: PaginationDto) {
+    const {page = 1, limit =10, order = 'desc'} = query
     const skip = (page - 1) * limit;
-
     const [data, total] = await this.prisma.$transaction([
       this.prisma.user.findMany({
         skip,
