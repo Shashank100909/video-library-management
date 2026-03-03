@@ -1,4 +1,4 @@
-import { Controller, Post, Body, UseGuards, Get, Delete, Param, ParseIntPipe, Patch, Query, DefaultValuePipe } from '@nestjs/common';
+import { Controller, Post, Body, UseGuards, Get, Delete, Param, ParseIntPipe, Patch, Query, DefaultValuePipe, Req } from '@nestjs/common';
 import { VideosService } from './videos.service';
 import { CreateVideoDto } from './dto/create-video.dto'
 import { UpdateVideoDto } from './dto/update-video.dto'
@@ -6,6 +6,8 @@ import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { RolesGuard } from '../auth/roles.guard';
 import { Roles } from '../auth/roles.decorator';
 import { UserRole } from '@prisma/client';
+import {PaginationDto } from '../common/dto/pagination.dto'
+import { queryObjects } from 'v8';
 
 @Controller('videos')
 export class VideosController {
@@ -16,15 +18,12 @@ export class VideosController {
     @Post()
     addVideo(@Body() createVideoDto: CreateVideoDto) {
         return this.videosService.create(createVideoDto)
+
     }
 
     @Get()
-    getAllMovies(
-      @Query('page', new DefaultValuePipe(1), ParseIntPipe) page: number,
-      @Query('limit', new DefaultValuePipe(10), ParseIntPipe) limit: number,
-      @Query('order', new DefaultValuePipe('desc')) order: 'asc' | 'desc',
-    ) {
-      return this.videosService.findAll(page, limit, order);
+    getAllMovies(@Query() query: PaginationDto) {
+        return this.videosService.findAll(query);
     }
 
     @UseGuards(JwtAuthGuard, RolesGuard)
@@ -42,5 +41,42 @@ export class VideosController {
         @Body() updateVideoDto: UpdateVideoDto,
     ) {
         return this.videosService.updateVideo(id, updateVideoDto);
+    }
+
+    @UseGuards(JwtAuthGuard)
+    @Post(':id/play')
+    recordPlay(
+        @Req() req,
+        @Param('id', ParseIntPipe) id: number,
+    ) {
+        console.log(req.user);
+        console.log('REQ USER:', req.user);
+        return this.videosService.recordPlay(req.user.userId, id);
+    }
+
+    @UseGuards(JwtAuthGuard)
+    @Post(':id/progress')
+    saveProgress(
+        @Req() req,
+        @Param('id', ParseIntPipe) id: number,
+        @Body('lastWatchedSecond', ParseIntPipe) lastWatchedSecond: number,
+    ) {
+        return this.videosService.saveProgress(
+            req.user.userId,
+            id,
+            lastWatchedSecond,
+        );
+    }
+
+    @UseGuards(JwtAuthGuard)
+    @Get(':id/progress')
+    getProgress(
+        @Req() req,
+        @Param('id', ParseIntPipe) id: number,
+    ) {
+        return this.videosService.getProgress(
+            req.user.userId,
+            id,
+        );
     }
 }

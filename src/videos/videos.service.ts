@@ -7,6 +7,7 @@ import { PrismaService } from '../prisma/prisma.service';
 import { CreateVideoDto } from './dto/create-video.dto';
 import { UpdateVideoDto } from './dto/update-video.dto';
 import { BorrowStatus } from '@prisma/client';
+import {PaginationDto} from '../common/dto/pagination.dto'
 
 @Injectable()
 export class VideosService {
@@ -34,7 +35,8 @@ export class VideosService {
     };
   }
 
-  async findAll(page: number, limit: number, order: 'asc' | 'desc') {
+  async findAll(query: PaginationDto) {
+    const {page = 1, limit =10, order = 'desc'} = query 
     const skip = (page - 1) * limit;
 
     const [data, total] = await this.prisma.$transaction([
@@ -124,6 +126,82 @@ export class VideosService {
     return {
       message: 'Video updated successfully',
       id: updated.id,
+    };
+  }
+
+  async recordPlay(userId: number, videoId: number) {
+    return this.prisma.$transaction(async (tx) => {
+      const video = await tx.video.findUnique({
+        where: { id: videoId },
+      });
+  
+      if (!video) {
+        throw new NotFoundException('Video not found');
+      }
+  
+      
+      await tx.video.update({
+        where: { id: videoId },
+        data: {
+          playCount: {
+            increment: 1,
+          },
+        },
+      });
+  
+      await tx.videoPlayHistory.create({
+        data: {
+          userId,
+          videoId,
+        },
+      });
+  
+      return { message: 'Play recorded successfully' };
+    });
+  }
+
+  async saveProgress(
+    userId: number,
+    videoId: number,
+    lastWatchedSecond: number,
+  ) {
+    
+    if (lastWatchedSecond < 0) {
+      throw new BadRequestException('Invalid timestamp');
+    }
+  
+    await this.prisma.userVideoProgress.upsert({
+      where: {
+        userId_videoId: {
+          userId,
+          videoId,
+        },
+      },
+      update: {
+        lastWatchedSecond,
+      },
+      create: {
+        userId,
+        videoId,
+        lastWatchedSecond,
+      },
+    });
+  
+    return { message: 'Progress saved successfully' };
+  }
+
+  async getProgress(userId: number, videoId: number) {
+    const progress = await this.prisma.userVideoProgress.findUnique({
+      where: {
+        userId_videoId: {
+          userId,
+          videoId,
+        },
+      },
+    });
+  
+    return {
+      lastWatchedSecond: progress?.lastWatchedSecond ?? 0,
     };
   }
 }
