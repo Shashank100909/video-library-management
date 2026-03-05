@@ -1,12 +1,13 @@
-import { Injectable, BadRequestException } from '@nestjs/common';
+import { Injectable, BadRequestException, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { CreateUserDto } from './dto/create-user.dto';
 import { UserResponseDto } from './dto/user-response.dto';
 import { UserRole } from '@prisma/client';
 import * as bcrypt from 'bcrypt';
 import { PaginationDto } from '../common/dto/pagination.dto'
-import {redisClient} from '../redis/redis.provider'
-
+import { redisClient } from '../redis/redis.provider'
+import { UpdateUserDto } from './dto/update-user.dto'
+import { ApiResponseDto } from '../common/dto/commonRespDto'
 const userSelect = {
   id: true,
   name: true,
@@ -17,7 +18,7 @@ const userSelect = {
 @Injectable()
 export class UsersService {
   constructor(private prisma: PrismaService,
-  ) {}
+  ) { }
 
   private async clearUsersCache() {
     const keys = await redisClient.keys('users:*');
@@ -47,7 +48,7 @@ export class UsersService {
     });
 
     await this.clearUsersCache();
-    
+
     return {
       id: user.id,
       name: user.name,
@@ -84,10 +85,54 @@ export class UsersService {
 
     const result = { total, page, limit, data };
 
-    await redisClient.set(cacheKey, JSON.stringify(result), {EX: 60});
+    await redisClient.set(cacheKey, JSON.stringify(result), { EX: 60 });
 
     console.log('Fetching from Database');
 
     return result;
+  }
+
+  async updateUser(id: number, updateUserDto: UpdateUserDto): Promise<ApiResponseDto<any>> {
+    const existing = await this.prisma.user.findUnique({
+      where: { id }
+    });
+
+    if (!existing) {
+      throw new NotFoundException('User does not exist')
+    }
+
+    const updateUser = await this.prisma.user.update({
+      where: { id },
+      data: updateUserDto,
+      select: {
+        id: true,
+        name: true,
+        email: true,
+        role: true
+      }
+    });
+
+    return new ApiResponseDto(
+      "User updated successfully",
+      updateUser
+    );
+  }
+
+  async deleteUser(id: number): Promise<ApiResponseDto<any>> {
+    const existing = await this.prisma.user.findUnique({
+      where: { id }
+    });
+  
+    if (!existing) {
+      throw new NotFoundException('User not found');
+    }
+  
+    await this.prisma.user.delete({
+      where: { id }
+    });
+  
+    return new ApiResponseDto(
+      "User deleted successfully",
+    );
   }
 }

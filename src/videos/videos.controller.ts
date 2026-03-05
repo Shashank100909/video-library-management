@@ -89,4 +89,14 @@ export class VideosController {
             data,
         };
     }
+
+    @Get('popular/last-30-days')
+    async getPopularLast30Days(@Query() query: PaginationDto) {
+        const data= await this.videosService.getPopularLast30Days(query);
+
+        return {
+            message: "Popular video in last 30 days fetched successfully",
+            data,
+        };
+    }
 }
