@@ -6,7 +6,9 @@ import { UsersModule } from './users/users.module';
 import { VideosModule } from './videos/videos.module';
 import { BorrowModule } from './borrow/borrow.module';
 import { AuthModule } from './auth/auth.module';
-import { PrismaModule } from './prisma/prisma.module'
+import { PrismaModule } from './prisma/prisma.module';
+import { CacheModule } from '@nestjs/cache-manager';
+import { createClient } from 'redis';
 
 @Module({
   imports: [
@@ -20,4 +22,4 @@ import { PrismaModule } from './prisma/prisma.module'
   controllers: [AppController],
   providers: [AppService],
 })
-export class AppModule {}
+export class AppModule { }

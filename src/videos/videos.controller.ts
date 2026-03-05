@@ -6,7 +6,7 @@ import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { RolesGuard } from '../auth/roles.guard';
 import { Roles } from '../auth/roles.decorator';
 import { UserRole } from '@prisma/client';
-import {PaginationDto } from '../common/dto/pagination.dto'
+import { PaginationDto } from '../common/dto/pagination.dto'
 import { queryObjects } from 'v8';
 
 @Controller('videos')
@@ -78,5 +78,25 @@ export class VideosController {
             req.user.userId,
             id,
         );
+    }
+
+    @Get('popular/all-time')
+    async getAllTimePopular(@Query('limit') limit?: string) {
+        const data = await this.videosService.getAllTimePopular(Number(limit) || 10);
+
+        return {
+            message: "All time popular videos fetched successfully",
+            data,
+        };
+    }
+
+    @Get('popular/last-30-days')
+    async getPopularLast30Days(@Query() query: PaginationDto) {
+        const data= await this.videosService.getPopularLast30Days(query);
+
+        return {
+            message: "Popular video in last 30 days fetched successfully",
+            data,
+        };
     }
 }

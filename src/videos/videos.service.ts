@@ -7,11 +7,12 @@ import { PrismaService } from '../prisma/prisma.service';
 import { CreateVideoDto } from './dto/create-video.dto';
 import { UpdateVideoDto } from './dto/update-video.dto';
 import { BorrowStatus } from '@prisma/client';
-import {PaginationDto} from '../common/dto/pagination.dto'
+import { PaginationDto } from '../common/dto/pagination.dto'
+import { redisClient } from '../redis/redis.provider'
 
 @Injectable()
 export class VideosService {
-  constructor(private prisma: PrismaService) {}
+  constructor(private prisma: PrismaService) { }
 
   async create(createVideoDto: CreateVideoDto) {
     const existing = await this.prisma.video.findFirst({
@@ -36,7 +37,14 @@ export class VideosService {
   }
 
   async findAll(query: PaginationDto) {
-    const {page = 1, limit =10, order = 'desc'} = query 
+    const { page = 1, limit = 10, order = 'desc' } = query
+    const cacheKey = `videos:${page}:${limit}:${order}`;
+    const cached = await redisClient.get(cacheKey);
+    console.log('Cached value:', cached);
+    if (cached) {
+      console.log('Fetching from Redis');
+      return cached;
+    }
     const skip = (page - 1) * limit;
 
     const [data, total] = await this.prisma.$transaction([
@@ -48,7 +56,13 @@ export class VideosService {
       this.prisma.video.count(),
     ]);
 
-    return { total, page, limit, data };
+    const result = { total, page, limit, data };
+
+    await redisClient.set(cacheKey, JSON.stringify(result), { EX: 60 });
+
+    console.log('Fetching from Database');
+
+    return result;
   }
 
   async deleteVideo(videoId: number) {
@@ -134,12 +148,12 @@ export class VideosService {
       const video = await tx.video.findUnique({
         where: { id: videoId },
       });
-  
+
       if (!video) {
         throw new NotFoundException('Video not found');
       }
-  
-      
+
+
       await tx.video.update({
         where: { id: videoId },
         data: {
@@ -148,14 +162,14 @@ export class VideosService {
           },
         },
       });
-  
+
       await tx.videoPlayHistory.create({
         data: {
           userId,
           videoId,
         },
       });
-  
+
       return { message: 'Play recorded successfully' };
     });
   }
@@ -165,11 +179,11 @@ export class VideosService {
     videoId: number,
     lastWatchedSecond: number,
   ) {
-    
+
     if (lastWatchedSecond < 0) {
       throw new BadRequestException('Invalid timestamp');
     }
-  
+
     await this.prisma.userVideoProgress.upsert({
       where: {
         userId_videoId: {
@@ -186,7 +200,7 @@ export class VideosService {
         lastWatchedSecond,
       },
     });
-  
+
     return { message: 'Progress saved successfully' };
   }
 
@@ -199,9 +213,60 @@ export class VideosService {
         },
       },
     });
-  
+
     return {
       lastWatchedSecond: progress?.lastWatchedSecond ?? 0,
     };
+  }
+
+  async getAllTimePopular(limit: number = 10) {
+    return this.prisma.video.findMany({
+      where: {
+        deletedAt: null,
+      },
+      orderBy: {
+        playCount: 'desc',
+      },
+      take: limit,
+      select: {
+        id: true,
+        title: true,
+        description: true,
+        playCount: true,
+        borrowCount: true,
+      },
+    });
+  }
+
+  async getPopularLast30Days(query: PaginationDto) {
+    const { page = 1, limit = 10 } = query;
+
+    const skip = (page - 1) * limit;
+    const thirtyDays = new Date();
+    thirtyDays.setDate(thirtyDays.getDate() - 30);
+    console.log("Thirty days ago date:", thirtyDays);
+
+    const popularVideos = await this.prisma.videoPlayHistory.groupBy({
+      by: ["videoId"],
+      _count: {
+        "videoId": true
+      },
+      where: {
+        playedAt: {
+          gte: thirtyDays,
+        },
+      },
+      orderBy: {
+        _count: {
+          videoId: 'desc',
+        },
+      },
+      skip,
+      take: limit,
+    });
+
+    return popularVideos.map((video) => ({
+      message: `videoId ${video.videoId} : played ${video._count.videoId} times`,
+    }));
   }
 }
